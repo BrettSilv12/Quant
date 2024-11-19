@@ -145,7 +145,7 @@ class FamaFrenchAnalyzer:
                         'investment_score': self._calculate_factor_score(model.params['CMA'], model.pvalues['CMA'])
                     },
                     'output_score': {
-                        self._calculate_output_score(model.params['const'],
+                        'score': self._calculate_output_score(model.params['const'],
                                                     model.params['MKT-RF'],
                                                     model.params['SMB'],
                                                     model.params['HML'],
@@ -176,7 +176,7 @@ class FamaFrenchAnalyzer:
         Calculate a score for how strong the individual stock is
         TODO
         """
-        return alpha
+        return np.power((500 * size) + (500 * value), profitability) * ar_squared #* alpha
 
     def format_results(self, results):
         """
@@ -205,7 +205,10 @@ class FamaFrenchAnalyzer:
             
             output += f"\nModel Fit:\n"
             output += f"  R-squared: {result['model_fit']['r_squared']:.4f}\n"
-            output += f"  Adjusted R-squared: {result['model_fit']['adj_r_squared']:.4f}\n\n"
+            output += f"  Adjusted R-squared: {result['model_fit']['adj_r_squared']:.4f}\n"
+
+            output += f"\nTotal Score:\n"
+            output += f"Total Score: {result['output_score']['score']}\n\n"
             
         return output
 
@@ -269,7 +272,7 @@ if __name__ == "__main__":
     analyzer = FamaFrenchAnalyzer()
     
     # Example stock tickers
-    tickers = ['UPS', 'NVDA', 'PLTR']
+    tickers = ['NVDA', 'PLTR', 'DELL', 'UPS']
     
     try:
         # Run analysis
