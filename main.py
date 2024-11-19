@@ -1,4 +1,4 @@
-import utils.py as ut
+import utils as ut
 
 stock_ticker = input("Enter the stock ticker symbol: ").upper()
 mode = input("Enter the mode: ").upper()

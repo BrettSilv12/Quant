@@ -143,6 +143,15 @@ class FamaFrenchAnalyzer:
                         'value_score': self._calculate_factor_score(model.params['HML'], model.pvalues['HML']),
                         'profitability_score': self._calculate_factor_score(model.params['RMW'], model.pvalues['RMW']),
                         'investment_score': self._calculate_factor_score(model.params['CMA'], model.pvalues['CMA'])
+                    },
+                    'output_score': {
+                        self._calculate_output_score(model.params['const'],
+                                                    model.params['MKT-RF'],
+                                                    model.params['SMB'],
+                                                    model.params['HML'],
+                                                    model.params['RMW'],
+                                                    model.params['CMA'],
+                                                    adj_r_squared)
                     }
                 }
                 
@@ -159,7 +168,15 @@ class FamaFrenchAnalyzer:
             return 0  # Not statistically significant
         
         # Normalize coefficient to a -1 to 1 scale
-        return np.clip(coefficient, -1, 1)
+        #return np.clip(coefficient, -1, 1)
+        return coefficient
+    
+    def _calculate_output_score(self, alpha, market_beta, size, value, profitability, investment, ar_squared):
+        """
+        Calculate a score for how strong the individual stock is
+        TODO
+        """
+        return alpha
 
     def format_results(self, results):
         """
