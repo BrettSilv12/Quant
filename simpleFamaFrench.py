@@ -111,7 +111,7 @@ def create_radar_plot(factor_values, save_path=None):
     
     # Plot data for each stock
     colors = plt.cm.rainbow(np.linspace(0, 1, len(factor_values)))
-    for (ticker, factors), color in zip(factor_values.items()):
+    for (ticker, factors), color in zip(factor_values.items(), colors):
         if factors is not None:
             values = [factors[cat] for cat in categories]
             values += values[:1]  # Complete the circle
