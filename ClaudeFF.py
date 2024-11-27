@@ -3,6 +3,7 @@ import numpy as np
 import yfinance as yf
 import plotly.graph_objs as go
 import statsmodels.api as sm
+import sectorinfo as si
 from scipy import stats
 from typing import List, Tuple, Dict, Union
 from getAllMarketCap import getMarketCapPercentile
@@ -49,10 +50,6 @@ class FactorScoreAnalyzer:
 
         except Exception as e:
             raise Exception(f"Error loading Fama-French factors: {str(e)}")
-        # Placeholder for Fama-French factor data sources
-        # You would replace these with actual data retrieval methods
-
-        self.calculator = MarketCapPercentileCalculator()
 
     def fetch_stock_data(self, tickers: List[str], date: str) -> pd.DataFrame:
         """
@@ -138,20 +135,20 @@ class FactorScoreAnalyzer:
             )
         except:
             enterprise_value = market_cap
-        
-        print(f"MCap: {market_cap}\nEVal: {enterprise_value}\n")
-        # Log transformation to handle exponential distribution of market caps
-        log_market_cap = np.log(market_cap) if market_cap > 0 else np.nan
-        log_enterprise_value = np.log(enterprise_value) if enterprise_value > 0 else np.nan
-        print(f"LOGMCap: {log_market_cap}\nLOGEVal: {log_enterprise_value}\n")
+
         # Compute percentile rank in market
-        # In practice, this would compare against a comprehensive market database
         size_percentile = stats.percentileofscore([
             0,
             2000000000, #small-mid cap limit
             10000000000, #mid-high cap limit
             3620000000000 #Nvidia highest cap
         ], ((market_cap + enterprise_value) / 2))
+        if (((market_cap + enterprise_value) / 2) < 2000000000):
+            size_percentile += ((market_cap + enterprise_value) / (2* 2000000000))
+        elif (((market_cap + enterprise_value) / 2) < 10000000000):
+            size_percentile += ((market_cap + enterprise_value) / (2* 10000000000))
+        else:
+            size_percentile += ((market_cap + enterprise_value) / (2* 3620000000000))
         #Beta: Use module to calculate total market size
         #size_percentile = getMarketCapPercentile(market_cap, self.calculator)
         print(f"SizePercentile: {size_percentile}\n")
@@ -178,31 +175,27 @@ class FactorScoreAnalyzer:
             'Price to Earnings': stock.info.get('trailingPE', np.nan),
             'Price to Sales': stock.info.get('priceToSalesTrailing12Months', np.nan)
         }
-        
-        # Filter out NaN values
-        valid_metrics = []
-        for v in value_metrics.values():
-            if not np.isnan(v):
-                valid_metrics.append(v)
-            else:
-                valid_metrics.append(0)
-        #valid_metrics = [v for v in value_metrics.values() if not np.isnan(v) else 0]
-        
-        if not valid_metrics:
-            return np.nan
-        
-        # Z-score normalization of value metrics
-        z_scores = stats.zscore(valid_metrics)
-        
-        # Combine z-scores with custom weighting
-        # Reward stocks with high book-to-market and low price multiples
-        value_factor = np.mean([
-            z_scores[0],  # Book to Market
-            -z_scores[1],  # Inverse of Price to Book (lower is better)
-            -z_scores[2],  # Inverse of Price to Earnings (lower is better)
-            -z_scores[3]   # Inverse of Price to Sales (lower is better)
-        ])
-        return value_factor
+
+        # Get PB of associated sector
+        sector_pb = si.get_sector_pb(stock.info["sector"])
+
+        # Get PB of sp500
+        sp5_pb = si.get_sp500_pb_ratio()['average_pb']
+
+        sector_relative_pb = sector_pb - value_metrics['Price to Book']
+        market_relative_pb = sp5_pb - value_metrics['Price to Book']
+        #SP500 typical PB range is 2.92 - 4.28
+        #PB more value than sector
+        print(f"PB FOR STOCK {ticker} IS {value_metrics['Price to Book']}\n")
+        print(f"PB FOR SP500 IS {sp5_pb}\n")
+        if(value_metrics['Price to Book'] < sp5_pb * .5):
+            return 1
+        #PB more growth than sector
+        elif(value_metrics['Price to Book'] > sp5_pb * 1.25):
+            return -1
+        #PB close to sector
+        else:
+            return 0
 
     def _calculate_profitability_factor(self, ticker: str, lookback_years: int = 5) -> float:
         """
@@ -211,6 +204,8 @@ class FactorScoreAnalyzer:
         :param ticker: Stock ticker symbol
         :param lookback_years: Years of historical data to analyze
         :return: Profitability characteristic score
+
+        DO PROFITABILITY TO REVENUE RATIO? PROFITABILITY TO DEBT? 
         """
         stock = yf.Ticker(ticker)
         
@@ -370,7 +365,7 @@ class FactorScoreAnalyzer:
 # Example usage
 if __name__ == "__main__":
     # Example tickers and date
-    tickers = ['AAPL', 'GOOGL', 'MSFT', 'PLNT', 'UPS', 'TSLA']
+    tickers = ['MSFT', 'PLTR', 'UPS', 'TSLA', 'NVDA', 'NAUT']
     analysis_date = '2023-12-31'
     
     # Initialize analyzer
