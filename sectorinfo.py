@@ -166,6 +166,9 @@ def get_pb_of_holdings(holdings):
         return None
     
 def get_sp500_pb_ratio():
+    #YFINANCE DATA IS WRONG, SO I HAVE TO MANUALLY UPDATE FOR NOW
+    #PER VANGUARD WEBSITE, VOO P/B IS 4.7x
+    return 4.7
     # Fetch S&P 500 components (using VOO as a representative ETF)
     sp500_etf = yf.Ticker('VOO')
     
@@ -175,14 +178,15 @@ def get_sp500_pb_ratio():
     try:
         # Get holdings
         holdings = sp500_etf.get_funds_data().top_holdings.index.to_list()
-        
+        print(f"HOLDINGS: {holdings}\n")
+        eqholdings = sp500_etf.get_funds_data().equity_holdings
+        print(f"EQHOLDINGS: {eqholdings}\n")
         if not holdings:
             # Fallback method: use manual list of top S&P 500 stocks
-            top_sp500_tickers = [
+            holdings = [
                 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 
                 'GOOG', 'BRK-B', 'UNH', 'XOM', 'JPM', 'JNJ', 'V', 'PG'
             ]
-            holdings = top_sp500_tickers
         
         # Collect P/B ratios
         for ticker in holdings[:500]:  # Limit to avoid API rate limits

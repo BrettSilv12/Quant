@@ -6,7 +6,6 @@ import statsmodels.api as sm
 import sectorinfo as si
 from scipy import stats
 from typing import List, Tuple, Dict, Union
-from getAllMarketCap import getMarketCapPercentile
 
 class FactorScoreAnalyzer:
     def __init__(self):
@@ -119,6 +118,8 @@ class FactorScoreAnalyzer:
         
         :param ticker: Stock ticker symbol
         :return: Size characteristic score
+        Ideally, the closer to max market cap, the closer to -2, and
+        the closer to 0, the closer to 2
         """
         stock = yf.Ticker(ticker)
         
@@ -138,25 +139,23 @@ class FactorScoreAnalyzer:
 
         # Compute percentile rank in market
         size_percentile = stats.percentileofscore([
-            0,
             2000000000, #small-mid cap limit
             10000000000, #mid-high cap limit
             3620000000000 #Nvidia highest cap
         ], ((market_cap + enterprise_value) / 2))
         if (((market_cap + enterprise_value) / 2) < 2000000000):
-            size_percentile += ((market_cap + enterprise_value) / (2* 2000000000))
+            size_percentile += 33 * ((market_cap + enterprise_value) / 2) / 2000000000
         elif (((market_cap + enterprise_value) / 2) < 10000000000):
-            size_percentile += ((market_cap + enterprise_value) / (2* 10000000000))
+            size_percentile += 33 * ((market_cap + enterprise_value) / 2) / 10000000000
         else:
-            size_percentile += ((market_cap + enterprise_value) / (2* 3620000000000))
-        #Beta: Use module to calculate total market size
-        #size_percentile = getMarketCapPercentile(market_cap, self.calculator)
-        print(f"SizePercentile: {size_percentile}\n")
+            size_percentile += 33 * ((market_cap + enterprise_value) / 2) / 3620000000000
+        print(f"SIZE PERCENTILE: {size_percentile}\n")
+    
         
         # Size factor: lower percentile means smaller company
-        size_factor = (50 - size_percentile) / 50
+        size_factor = 2* (50 - size_percentile) / 50
+        return max(-2, min(2, size_factor))
         
-        return size_factor
 
     def _calculate_value_factor(self, ticker: str) -> float:
         """
@@ -164,6 +163,8 @@ class FactorScoreAnalyzer:
         
         :param ticker: Stock ticker symbol
         :return: Value characteristic score
+        IF P/B of a stock is 1, the value_score will be = 2
+        IF P/B is > 55ish, the value_score will be -2
         """
         stock = yf.Ticker(ticker)
         
@@ -180,19 +181,17 @@ class FactorScoreAnalyzer:
         sector_pb = si.get_sector_pb(stock.info["sector"])
 
         # Get PB of sp500
-        sp5_pb = si.get_sp500_pb_ratio()['average_pb']
+        sp5_pb = si.get_sp500_pb_ratio()#['average_pb']
 
         sector_relative_pb = sector_pb - value_metrics['Price to Book']
         market_relative_pb = sp5_pb - value_metrics['Price to Book']
-        #SP500 typical PB range is 2.92 - 4.28
-        #PB more value than sector
-        print(f"PB FOR STOCK {ticker} IS {value_metrics['Price to Book']}\n")
-        print(f"PB FOR SP500 IS {sp5_pb}\n")
+        value_score = sp5_pb - np.log(value_metrics['Price to Book']) - (sp5_pb - 2)
+        return max(-2, min(value_score, 2)) #clip values to -2:2 range
         if(value_metrics['Price to Book'] < sp5_pb * .5):
-            return 1
+            return 0.5
         #PB more growth than sector
         elif(value_metrics['Price to Book'] > sp5_pb * 1.25):
-            return -1
+            return -0.5
         #PB close to sector
         else:
             return 0
@@ -204,8 +203,6 @@ class FactorScoreAnalyzer:
         :param ticker: Stock ticker symbol
         :param lookback_years: Years of historical data to analyze
         :return: Profitability characteristic score
-
-        DO PROFITABILITY TO REVENUE RATIO? PROFITABILITY TO DEBT? 
         """
         stock = yf.Ticker(ticker)
         
@@ -213,38 +210,28 @@ class FactorScoreAnalyzer:
         income_statements = stock.financials
         
         if income_statements.empty:
+            print("EMPTY INCOME STATEMENT")
             return np.nan
-        
+            
         # Multiple profitability metrics
         metrics = {
-            'Operating Margin': income_statements.loc['Operating Income'],
-            'Net Profit Margin': income_statements.loc['Net Income'],
+            'Operating Income': income_statements.loc['Operating Income'],
+            'Net Income': income_statements.loc['Net Income'],
             'Return on Equity': stock.info.get('returnOnEquity', np.nan),
             'Return on Assets': stock.info.get('returnOnAssets', np.nan)
         }
-        
-        # Compute percentage change and remove outliers
-        profitability_series = []
-        for name, data in metrics.items():
-            if isinstance(data, pd.Series):
-                pct_changes = data.pct_change()
-                # Winsorize to remove extreme values
-                profitability_series.extend(stats.mstats.winsorize(pct_changes))
-        
-        # Compute robust profitability score
-        if profitability_series:
-            robust_profitability = np.mean(profitability_series)
-            profitability_volatility = np.std(profitability_series)
-            
-            # Advanced scoring: reward consistent, high profitability
-            profitability_factor = (
-                robust_profitability * 0.6 +  # Primary profitability
-                (-profitability_volatility) * 0.4  # Penalize inconsistency
-            )
-            
-            return profitability_factor
-        
-        return np.nan
+        #print(f"ROE: {metrics['Return on Equity']}\n ROA: {metrics['Return on Assets']}\n")
+        #print(f"Op In: {metrics['Operating Income']}\n Net In: {metrics['Net Income']}\n")
+        #ROE is more sensitive to a company's leverage, whereas ROA is not
+        #ROE : Success of using leverage to generate profit
+        #ROA : Efficiency of managing their assets
+        #operating income: post operating-expense income - how well a company's core-business is running
+        #net income: post-everything income / take-home. 
+        #ASK MCKAY: 
+        #1. How to accurately measure market cap percentile on the sliding scale
+        #2. How to properly evaluate 2 variables above another (emphasize roa > roe but both over op. income)
+        profitability_factor = metrics['Return on Assets'] + metrics['Return on Equity']
+        return profitability_factor
 
 
     def _calculate_investment_factor(self, ticker: str, lookback_years: int = 5) -> float:
@@ -263,28 +250,35 @@ class FactorScoreAnalyzer:
         
         # Validate data availability
         if balance_sheets.empty:
+            print("BALANCE SHEET EMPTY")
             return np.nan
         
         # Calculate asset growth rates
-        total_assets = balance_sheets.loc['Total Assets']
+        print("1\n")
+        total_assets = balance_sheets.loc['Total Assets'] # reverse order
+        print(f"2 {total_assets}\n")
         asset_growth_rates = total_assets.pct_change()
         
         # Robust growth rate estimation
-        # Use median growth rate to reduce impact of outliers
-        median_growth = np.median(asset_growth_rates)
+        print(f"3 {asset_growth_rates}\n")
+        median_growth = np.mean(asset_growth_rates) # not properly getting a mean - just returning nan (values are ina map?)
         
         # Variation analysis
+        print(f"4 {median_growth}\n")
         growth_volatility = np.std(asset_growth_rates)
         
         # Incorporate investment consistency
+        print(f"5 {growth_volatility}\n")
         consistency_score = 1 - stats.variation(asset_growth_rates)
         
         # Investment factor: combine growth, volatility, and consistency
+        print(f"6 {consistency_score}\n")
         investment_factor = (
             median_growth * 0.5 +  # Directional growth
             (-growth_volatility) * 0.3 +  # Penalize volatility
             consistency_score * 0.2  # Reward consistency
         )
+        print(f"7 {investment_factor}\n")
         
         return investment_factor
 
