@@ -5,7 +5,10 @@ import plotly.graph_objs as go
 import statsmodels.api as sm
 import sectorinfo as si
 from scipy import stats
-from typing import List, Tuple, Dict, Union
+from typing import List
+from datetime import date
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 class FactorScoreAnalyzer:
     def __init__(self):
@@ -98,21 +101,27 @@ class FactorScoreAnalyzer:
         """
         # Fetch stock data
         stock_data = self.fetch_stock_data(tickers, date)
-        
+
+        original_date = datetime.strptime(date, "%Y-%m-%d")
+        # Subtract 5 months
+        five_months_prior = original_date - relativedelta(months=5)
+        # Convert back to YYYY-MM-DD string format
+        five_months_prior = five_months_prior.strftime("%Y-%m-%d")
+
         # Calculate factor scores
         factor_scores = {}
         for ticker, row in stock_data.iterrows():
             factor_scores[ticker] = {
-                'Size_SMB': self._calculate_size_factor(ticker),
-                'Value_HML': self._calculate_value_factor(ticker),
-                'Profitability_RMW': self._calculate_profitability_factor(ticker),
-                'Investment_CMA': self._calculate_investment_factor(ticker),
-                'Market_Beta': self._calculate_market_beta(ticker, date, '2024-10-01')
+                'Size_SMB': self._calculate_size_factor(ticker, date),
+                'Value_HML': self._calculate_value_factor(ticker, date),
+                'Profitability_RMW': self._calculate_profitability_factor(ticker, date),
+                'Investment_CMA': self._calculate_investment_factor(ticker, date),
+                'Market_Beta': self._calculate_market_beta(ticker, five_months_prior, date)
             }
         
         return pd.DataFrame.from_dict(factor_scores, orient='index')
 
-    def _calculate_size_factor(self, ticker: str) -> float:
+    def _calculate_size_factor(self, ticker: str, date) -> float:
         """
         Advanced Size Factor (Small Minus Big Market Cap)
         
@@ -149,7 +158,6 @@ class FactorScoreAnalyzer:
             size_percentile += 33 * ((market_cap + enterprise_value) / 2) / 10000000000
         else:
             size_percentile += 33 * ((market_cap + enterprise_value) / 2) / 3620000000000
-        print(f"SIZE PERCENTILE: {size_percentile}\n")
     
         
         # Size factor: lower percentile means smaller company
@@ -157,7 +165,7 @@ class FactorScoreAnalyzer:
         return max(-2, min(2, size_factor))
         
 
-    def _calculate_value_factor(self, ticker: str) -> float:
+    def _calculate_value_factor(self, ticker: str, date) -> float:
         """
         Advanced Value Factor (High vs Low Book-to-Market)
         
@@ -196,7 +204,7 @@ class FactorScoreAnalyzer:
         else:
             return 0
 
-    def _calculate_profitability_factor(self, ticker: str, lookback_years: int = 5) -> float:
+    def _calculate_profitability_factor(self, ticker: str, date, lookback_years: int = 5) -> float:
         """
         Advanced Profitability Factor (Robust vs Weak Profitability)
         
@@ -234,7 +242,7 @@ class FactorScoreAnalyzer:
         return profitability_factor
 
 
-    def _calculate_investment_factor(self, ticker: str, lookback_years: int = 5) -> float:
+    def _calculate_investment_factor(self, ticker: str, date, lookback_years: int = 5) -> float:
         """
         Advanced Investment Factor (Conservative vs Aggressive Investment)
         
@@ -254,35 +262,18 @@ class FactorScoreAnalyzer:
             return np.nan
         
         # Calculate asset growth rates
-        print("1\n")
-        total_assets = balance_sheets.loc['Total Assets'] # reverse order
-        print(f"2 {total_assets}\n")
+        total_assets = balance_sheets.loc['Total Assets'] 
+        total_assets = total_assets.iloc[::-1] # reverses order
         asset_growth_rates = total_assets.pct_change()
         
         # Robust growth rate estimation
-        print(f"3 {asset_growth_rates}\n")
-        median_growth = np.mean(asset_growth_rates) # not properly getting a mean - just returning nan (values are ina map?)
-        
-        # Variation analysis
-        print(f"4 {median_growth}\n")
-        growth_volatility = np.std(asset_growth_rates)
-        
-        # Incorporate investment consistency
-        print(f"5 {growth_volatility}\n")
-        consistency_score = 1 - stats.variation(asset_growth_rates)
-        
-        # Investment factor: combine growth, volatility, and consistency
-        print(f"6 {consistency_score}\n")
-        investment_factor = (
-            median_growth * 0.5 +  # Directional growth
-            (-growth_volatility) * 0.3 +  # Penalize volatility
-            consistency_score * 0.2  # Reward consistency
-        )
-        print(f"7 {investment_factor}\n")
+        mean_growth = asset_growth_rates.mean()
+        #INSTEAD OF THE FOLLOWING - CAN WE GET A NUMBER TO SHOW RATE OF CHANGE OF GROWTH?
+        investment_factor = mean_growth
         
         return investment_factor
 
-    def _calculate_market_beta(self, ticker: str, start_date: str, end_date: str) -> float:
+    def _calculate_market_beta(self, ticker: str, start_date: str, end_date: str = date.today().strftime("%Y-%m-%d")) -> float:
         """
         Advanced Market Beta Calculation using Rolling Regression
         
@@ -321,7 +312,7 @@ class FactorScoreAnalyzer:
         shrinkage_factor = min(max(abs(t_stat), 0.1), 2)
         shrunk_beta = (shrinkage_factor * beta + prior_beta) / (1 + shrinkage_factor)
         
-        return shrunk_beta
+        return -1 * max(-2, min(2, shrunk_beta)) #inverse sign, because a higher score now means less volatile
 
     def create_factor_radar_plot(self, factor_scores: pd.DataFrame) -> go.Figure:
         """
@@ -359,8 +350,8 @@ class FactorScoreAnalyzer:
 # Example usage
 if __name__ == "__main__":
     # Example tickers and date
-    tickers = ['MSFT', 'PLTR', 'UPS', 'TSLA', 'NVDA', 'NAUT']
-    analysis_date = '2023-12-31'
+    tickers = ['MSFT', 'PLTR', 'UPS', 'TSLA', 'NVDA', 'NAUT', 'ASTS', 'COKE', 'GOOG', 'UNP']
+    analysis_date = date.today().strftime("%Y-%m-%d")
     
     # Initialize analyzer
     analyzer = FactorScoreAnalyzer()
@@ -374,46 +365,3 @@ if __name__ == "__main__":
     # Optional: Save or display results
     print(factor_scores)
     radar_plot.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-1. Market-RF: get market-rf and r-f (how succeptible is company to market movement)
-2. Size: get percentile size of company to market
-3. Value: get percentile value of company to market and sector
-4. Profitability: get percentile profitability to sector
-5. Investment: ignore for now
-
-"""
