@@ -153,11 +153,11 @@ class FactorScoreAnalyzer:
             3620000000000 #Nvidia highest cap
         ], ((market_cap + enterprise_value) / 2))
         if (((market_cap + enterprise_value) / 2) < 2000000000):
-            size_percentile += 33 * ((market_cap + enterprise_value) / 2) / 2000000000
+            size_percentile += 33 * (((market_cap + enterprise_value) / 2) - 0) / (2000000000 - 0)
         elif (((market_cap + enterprise_value) / 2) < 10000000000):
-            size_percentile += 33 * ((market_cap + enterprise_value) / 2) / 10000000000
+            size_percentile += 33 * (((market_cap + enterprise_value) / 2) - 2000000000) / (10000000000 - 2000000000)
         else:
-            size_percentile += 33 * ((market_cap + enterprise_value) / 2) / 3620000000000
+            size_percentile += 33 * (((market_cap + enterprise_value) / 2) - 10000000000) / (3620000000000 - 10000000000)
     
         
         # Size factor: lower percentile means smaller company
@@ -236,8 +236,10 @@ class FactorScoreAnalyzer:
         #operating income: post operating-expense income - how well a company's core-business is running
         #net income: post-everything income / take-home. 
         #ASK MCKAY: 
-        #1. How to accurately measure market cap percentile on the sliding scale
-        #2. How to properly evaluate 2 variables above another (emphasize roa > roe but both over op. income)
+        #1. How to accurately measure market cap percentile on the sliding scale:
+        #       Just do what ur doing boss
+        #2. How to properly evaluate 2 variables above another (emphasize roa > roe but both over op. income):
+        #       not possible without essentially encoding
         profitability_factor = metrics['Return on Assets'] + metrics['Return on Equity']
         return profitability_factor
 
@@ -269,6 +271,8 @@ class FactorScoreAnalyzer:
         # Robust growth rate estimation
         mean_growth = asset_growth_rates.mean()
         #INSTEAD OF THE FOLLOWING - CAN WE GET A NUMBER TO SHOW RATE OF CHANGE OF GROWTH?
+        #2nd derrivative that also shows if last 2 values trend positive:
+        #   complex number - real part determines change and complex part determines latest trend (a+bi)
         investment_factor = mean_growth
         
         return investment_factor
@@ -350,8 +354,8 @@ class FactorScoreAnalyzer:
 # Example usage
 if __name__ == "__main__":
     # Example tickers and date
-    tickers = ['MSFT', 'PLTR', 'UPS', 'TSLA', 'NVDA', 'NAUT', 'ASTS', 'COKE', 'GOOG', 'UNP']
-    analysis_date = date.today().strftime("%Y-%m-%d")
+    tickers = ['UPS', 'FDX', 'COKE', 'UNP']
+    analysis_date = '2024-11-30'#date.today().strftime("%Y-%m-%d")
     
     # Initialize analyzer
     analyzer = FactorScoreAnalyzer()

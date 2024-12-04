@@ -95,13 +95,22 @@ def format_results(results):
 if __name__ == "__main__":
     # Example portfolio: 40% AAPL, 30% GOOGL, 30% MSFT
     portfolio = {
-        'AAPL': 0.4,
-        'GOOGL': 0.3,
-        'MSFT': 0.3
+        'UNP': 0.4,
+        'UPS': 0.3,
+        'COKE': 0.3
+    }
+
+    portfolioB = {
+        'VOO': 1
+    }
+
+    portfolioC = {
+        'COKE': .5,
+        'UNP' : .5
     }
     
     try:
-        results = calculate_portfolio_return('2023-01-01', portfolio)
+        results = calculate_portfolio_return('2016-01-01', portfolioC)
         print(format_results(results))
     except Exception as e:
         print(f"Error: {str(e)}")
