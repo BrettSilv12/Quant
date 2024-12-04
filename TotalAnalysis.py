@@ -1,7 +1,11 @@
 import pandas as pd
 import numpy as np
 import yfinance as yf
+import plotly.graph_objs as go
 import statsmodels.api as sm
+import sectorinfo as si
+from scipy import stats
+from typing import List
 from datetime import date
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -30,10 +34,10 @@ class StockFF:
         self.MBeta = self.calculateMarketBeta()
     
     def evaluateFactorScores(self):
-        self.value_score = None
-        self.size_score = None
-        self.profitability_score = None
-        self.investment_score = None
+        self.value_score = self.evaluateValue()
+        self.size_score = self.evaluateSize()
+        self.profitability_score = self.evaluateProfitability()
+        self.investment_score = self.evaluateInvestment()
         
     def rawData(self):
         return {
@@ -178,3 +182,58 @@ class StockFF:
         shrunk_beta = (shrinkage_factor * beta + prior_beta) / (1 + shrinkage_factor)
         
         return -1 * max(-2, min(2, shrunk_beta)) #inverse sign, because a higher score now means less volatile
+    
+
+
+
+
+
+    def evaluateValue(self):
+        value_metrics = self.value
+
+        # Get PB of associated sector
+        sector_pb = si.get_sector_pb(self.yfticker.info["sector"])
+
+        # Get PB of sp500
+        sp5_pb = si.get_sp500_pb_ratio()#['average_pb']
+
+        sector_relative_pb = sector_pb - value_metrics['Price to Book']
+        market_relative_pb = sp5_pb - value_metrics['Price to Book']
+        value_score = sp5_pb - np.log(value_metrics['Price to Book']) - (sp5_pb - 2)
+        return max(-2, min(value_score, 2)) #clip values to -2:2 range
+    
+
+
+    def evaluateSize(self):
+        market_cap = self.size['Market Cap']
+        enterprise_value = self.size['Enterprise Value']
+        # Compute percentile rank in market
+        size_percentile = stats.percentileofscore([
+            2000000000, #small-mid cap limit
+            10000000000, #mid-high cap limit
+            3620000000000 #Nvidia highest cap
+        ], ((market_cap + enterprise_value) / 2))
+        if (((market_cap + enterprise_value) / 2) < 2000000000):
+            size_percentile += 33 * (((market_cap + enterprise_value) / 2) - 0) / (2000000000 - 0)
+        elif (((market_cap + enterprise_value) / 2) < 10000000000):
+            size_percentile += 33 * (((market_cap + enterprise_value) / 2) - 2000000000) / (10000000000 - 2000000000)
+        else:
+            size_percentile += 33 * (((market_cap + enterprise_value) / 2) - 10000000000) / (3620000000000 - 10000000000)
+    
+        # Size factor: lower percentile means smaller company
+        size_factor = 2* (50 - size_percentile) / 50
+        return max(-2, min(2, size_factor))
+    
+
+
+    def evaluateProfitability(self):
+        metrics = self.profitability
+        profitability_factor = metrics['Return on Assets'] + metrics['Return on Equity']
+        return profitability_factor
+    
+
+
+    def evaluateInvestment(self):
+        investment_factor = self.investment['Mean Growth']
+        
+        return investment_factor
