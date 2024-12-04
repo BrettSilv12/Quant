@@ -134,7 +134,7 @@ class StockFF:
     
 
 
-    def calculateMarketBeta(self, end_date: str = date.today().strftime("%Y-%m-%d")) -> float:
+    def calculateMarketBeta(self, end_date: str = date.today()) -> float:
         """
         Advanced Market Beta Calculation using Rolling Regression
         
@@ -150,6 +150,7 @@ class StockFF:
         # Convert back to YYYY-MM-DD string format
         five_months_prior = five_months_prior.strftime("%Y-%m-%d")
         start_date = five_months_prior
+        end_date = end_date.strftime("%Y-%m-%d")
 
         # Fetch stock and market returns
         stock_data = yf.download(ticker, start=start_date, end=end_date)

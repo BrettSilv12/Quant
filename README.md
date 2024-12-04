@@ -9,6 +9,8 @@ This file takes in a list of tickers and evaluates them using the criteria of th
 <h1>portfolioReturns.py</h1>
 This file takes in a date and a map of stock tickers to ratios, then returns the market return for the given portfolio starting at the given date. </br>
 
+<h1>sectorInfo.py</h1>
+This file is a module that can be used to return sector data for a given stock. </br>
 
 <h1>TotalAnalysis.py</h1>
 This file is a class definition that will automatically turn a given ticker into a full FF analysis. </br>
@@ -25,3 +27,6 @@ Profitability: the higher the score, the more profitable the company is, </br>
 Investment: somewhat negligible due to profitability axis - the more positive the score, the more conservatively they reinvest </br>
 Scores - somewhat arbitrary - used to test different weights on each factor </br>
 The linear regression is run as an experimental exploration of these factors compared to the stock's returns. 
+
+<h1>Utils/</h1>
+This folder essentially holds misc/loose files and one-off utilities. </br>
