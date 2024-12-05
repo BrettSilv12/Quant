@@ -4,6 +4,8 @@ import yfinance as yf
 import plotly.graph_objs as go
 import statsmodels.api as sm
 import sectorinfo as si
+import pprint
+import json
 from scipy import stats
 from typing import List
 from datetime import date
@@ -47,6 +49,12 @@ class StockFF:
             'Investment'    : self.investment,
             'Market Beta'   : self.MBeta
         }
+    
+    def printRawData(self):
+        data = self.rawData()
+        #print(json.dumps(data, indent=4))
+        pprint.pprint(data)
+        return
     
     def scoredData(self):
         return {
