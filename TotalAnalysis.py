@@ -25,6 +25,11 @@ class StockFF:
         self.size_score = None
         self.profitability_score = None
         self.investment_score = None
+        self.MBeta_score = None
+        self.value_bucket = 0
+        self.size_bucket = 0
+        self.profitability_bucket = 0
+        self.investment_bucket = 0
         self.getFactorAttributes()
         self.evaluateFactorScores()
 
@@ -40,6 +45,7 @@ class StockFF:
         self.size_score = self.evaluateSize()
         self.profitability_score = self.evaluateProfitability()
         self.investment_score = self.evaluateInvestment()
+        self.MBeta_score = self.evaluateBeta()
         
     def rawData(self):
         return {
@@ -52,8 +58,10 @@ class StockFF:
     
     def printRawData(self):
         data = self.rawData()
+        print(f"{'*' * 20}\n{self.ticker} Raw Data\n{'*' * 20}")
         #print(json.dumps(data, indent=4))
         pprint.pprint(data)
+        print(f"{'*' * 20}\n\n\n")
         return
     
     def scoredData(self):
@@ -64,6 +72,12 @@ class StockFF:
             'Investment Score'    : self.investment_score,
             'Market Beta Score'   : self.MBeta
         }
+    
+    def printScoredData(self):
+        print(f"{'*' * 20}\n{self.ticker} Scored Data\n{'*' * 20}")
+        pprint.pprint(self.scoredData())
+        print(f"{'*' * 20}\n\n\n")
+        return
     
 
 
@@ -190,7 +204,7 @@ class StockFF:
         shrinkage_factor = min(max(abs(t_stat), 0.1), 2)
         shrunk_beta = (shrinkage_factor * beta + prior_beta) / (1 + shrinkage_factor)
         
-        return -1 * max(-2, min(2, shrunk_beta)) #inverse sign, because a higher score now means less volatile
+        return -1 * shrunk_beta #inverse sign, because a higher score now means less volatile
     
 
 
@@ -244,5 +258,7 @@ class StockFF:
 
     def evaluateInvestment(self):
         investment_factor = self.investment['Mean Growth']
-        
         return investment_factor
+    
+    def evaluateBeta(self):
+        return max(-2, min(2, self.MBeta))
